@@ -1,9 +1,12 @@
-# Flask WebRTC Demo
+# Flask OTR WebRTC Demo
 
 This project demononstrates how to implement WebRTC with Flask.
 
 Motivations behind project:
- - Create simple example to experiment
+ - Create simple example to experiment with
+ - Experiment with WebRTC
+ - Experiment with OTR
+ - Experiment with Flask + SSE
  - Use [SSE](https://developer.mozilla.org/en-US/docs/Server-sent_events/Using_server-sent_events) and not WebSockets
 
 # Installation
