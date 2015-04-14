@@ -1,6 +1,6 @@
 # Flask OTR WebRTC Demo
 
-This project demonystrates how to implement [Off The Record](http://en.wikipedia.org/wiki/Off-the-Record_Messaging) [WebRTC](http://www.webrtc.org/) chat with [Flask](http://flask.pocoo.org/).
+This project demonstrates how to implement [Off The Record](http://en.wikipedia.org/wiki/Off-the-Record_Messaging) [WebRTC](http://www.webrtc.org/) chat with [Flask](http://flask.pocoo.org/).
 
 Motivations behind project:
  - Create simple example to experiment with
