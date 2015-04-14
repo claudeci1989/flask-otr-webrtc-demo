@@ -1,6 +1,6 @@
 # Flask OTR WebRTC Demo
 
-This project demonstrates how to implement [Off The Record](http://en.wikipedia.org/wiki/Off-the-Record_Messaging) [WebRTC](http://www.webrtc.org/) chat with [Flask](http://flask.pocoo.org/).
+This project demonystrates how to implement [Off The Record](http://en.wikipedia.org/wiki/Off-the-Record_Messaging) [WebRTC](http://www.webrtc.org/) chat with [Flask](http://flask.pocoo.org/).
 
 Motivations behind project:
  - Create simple example to experiment with
@@ -11,10 +11,10 @@ Motivations behind project:
 
 # Installation
 
-    git clone https://github.com/spectralsun/flask-webrtc-demo.git
-    cd flaks-webrtc-demo
-    virtualenv webrtc
-    source webrtc/bin/activate
+    git clone https://github.com/spectralsun/flask-otr-webrtc-demo.git
+    cd flaks-otr-webrtc-demo
+    virtualenv venv
+    source venv/bin/activate
     pip install -r requirements.txt
 
 Then run the development server with:
