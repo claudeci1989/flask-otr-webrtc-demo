@@ -12,7 +12,7 @@ Motivations behind project:
 # Installation
 
     git clone https://github.com/spectralsun/flask-otr-webrtc-demo.git
-    cd flaks-otr-webrtc-demo
+    cd flask-otr-webrtc-demo
     virtualenv venv
     source venv/bin/activate
     pip install -r requirements.txt
