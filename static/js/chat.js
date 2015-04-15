@@ -84,13 +84,12 @@
         rooms: {},
         me: null, // ID f this connection
         room: null,
-        _events: {} // Event callbacks
+        _events: {}, // Event callbacks
+        is_using_otr: false
     };
-  //  if (browser === 'firfox')
-    //    rtc.STUN_SERVERS = {iceServers:[{"url":"stun:23.21.150.121"}]}
 
     /*
-     * Set callbacks for space-seperated event string.
+     * Set callback(s) for space-deliminated event string.
      */
     rtc.on = function(event, callback) {
         var events = event.split(' ');
@@ -102,8 +101,9 @@
         }
         return this;
     }
+
     /*
-     * Fire callbacks for space-seperated event string.
+     * Fire callback(s) for space-deliminated event string.
      */
     rtc.fire = function(event/* ... args */) {
         var events = event.split(' ');
@@ -353,6 +353,18 @@
             console.error(err);
             rtc.fire('set_remote_description_error', username)
         }); 
+    }
+
+    rtc.set_secret = function(secret) {
+        rtc.is_using_otr = !!secret;
+        rtc.otr_secret = secret;
+        if (rtc.is_using_otr) {
+            rtc.init_otr();
+        }
+        rtc.emit(secret? 'otr_on' : 'otr_off')
+            .done(function(){ rtc.fire('set_secret'); });
+        ;
+        return this;
     }
 
     rtc.add_streams = function() {
