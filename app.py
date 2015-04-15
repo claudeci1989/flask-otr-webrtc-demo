@@ -249,28 +249,24 @@ def on_set_name():
     print 'Set username', request.form
 
     if len(request.form['username']) == 0:
+        # TODO: more name validation
         return jsonify(dict(
             error='Invalid username',
             username=request.form['username']
         ))
 
     # Verify username is not alread in use
-    """
     for id in rtc.users:
         user = rtc.users[id]
         if user.username == request.form['username'] and \
-           user.id != rtc.socket_id:
-            emit('set_username_error', dict(
-                error='Username already in use',
-                username=request.form['username']
-            ))
+           user.id != request.stream_id:
             return jsonify(error='Username already in use', _status=400)
-    """
 
     user = rtc.get_current_user()
 
     if not user:
-        return jsonify(_status=400)
+        return jsonify(error="Missing or invalid X-Stream-ID header", 
+            _status=400)
     
     old_username = user.username
     if old_username:
@@ -285,11 +281,11 @@ def on_set_name():
 
     return jsonify(success=True)
 
-
 @app.route('/join_room', methods=['POST'])
 def on_join_room():
     """Join a webRTC room"""
     print 'join_room', request.form
+    # TODO: room name validation
     room = rtc.get_room(request.form['room'])
     user = rtc.get_current_user()
     room.user_join(user)
