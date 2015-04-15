@@ -203,10 +203,15 @@ thread.start_new_thread(heartbeat, (heartbeat_interval,))
 @app.before_request
 def before_request():
     stream_id = None
+    user = None
     if 'X-Stream-ID' in request.headers:
         stream_id = request.headers['X-Stream-ID']
-    print 'before_request', stream_id
+        if stream_id in rtc.users:
+            user = rtc.users[stream_id]
     setattr(request, 'stream_id', stream_id)
+    setattr(request, 'webrtc_user', user)
+
+
 
 @app.route('/')
 def index():
