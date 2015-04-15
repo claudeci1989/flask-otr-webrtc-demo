@@ -21,6 +21,12 @@
         strings.bold = function() {
             return "<strong>%0</strong>".f(this);
         }
+        strings.toID = function() {
+            var id = 0;
+            for (var x = 0; x < this.length; x++) 
+                id += this.charCodeAt(x);
+            return id;
+        }
         /*
          * Use this to avoid xss
          * recommended escaped char's found here 
