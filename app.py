@@ -74,6 +74,10 @@ class WebRTCUser(object):
             print 'Emitting %s to %s' % (payload, self)
         self.messages.put_nowait(payload)
 
+    def emit_to_rooms(self, event, **data):
+        for room in self.rooms:
+            room.emit(event, **data)
+
     def to_JSON(self):
         return dict(
             id=self.id,
@@ -100,8 +104,7 @@ class WebRTCRoom(object):
         self.users.append(user)
         user.rooms.append(self)
         print user.id
-        self.emit('user_join', 
-            exclude=user.id,
+        self.emit('user_join', _exclude=user.id,
             username=user.username,
             room=self.name)
 
@@ -109,17 +112,16 @@ class WebRTCRoom(object):
         try:
             self.users.remove(user)
             user.rooms.remove(self)
-            self.emit('user_leave', dict(
+            self.emit('user_leave', _exclude=user.id,
                 disconnect=disconnect,
-                username=user.username
-            ), exclude=user.id)
+                username=user.username)
         except:
             pass
 
     def emit(self, event, **data):
         data['event'] = event
         payload = json.dumps(data)
-        exclude = data.pop('exclude', None)
+        exclude = data.pop('_exclude', None)
         print 'Room %s emitting %s to %s exlcuding %s' % (self.name, payload, self.users, exclude)
         for user in self.users:
             if exclude and user.id == exclude:
