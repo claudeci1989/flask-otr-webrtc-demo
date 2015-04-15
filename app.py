@@ -173,6 +173,10 @@ def event_stream(stream_id):
     except:
         print 'Error sending hello to %s' % stream_id
         connected = False
+        print 'Stream %s is disconnected' % stream_id
+        rtc.disconnected(stream_id)
+        return
+
     while connected:
         #print 'Waiting for a message to send to %s' % stream_id
         message = user.messages.get(block=True, timeout=None)
