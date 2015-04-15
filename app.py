@@ -1,5 +1,4 @@
 import datetime
-import flask
 import json
 import thread
 import time
@@ -50,6 +49,7 @@ class WebRTCUser(object):
     username = None
     connected_at = None
     namespace = None
+    is_using_otr = False
 
     def __init__(self, id, username=None):
         self.id = id
@@ -219,8 +219,22 @@ def stream():
 def debug():
     return render_template('debug.html', rtc=rtc)
 
+@app.route('/otr_on', methods=['POST'])
+def on_otr_on():
+    print 'OTR on', request.webrtc_user
+    if request.webrtc_user and not request.webrtc_user.is_using_otr:
+        request.webrtc_user.is_using_otr = True 
+    return jsonify(success=True)
+
+@app.route('/otr_off', methods=['POST'])
+def on_otr_off():
+    print 'OTR off', request.webrtc_user
+    if request.webrtc_user and request.webrtc_user.is_using_otr:
+        requset.webrtc_user.is_using_otr = False
+    return jsonify(success=True)
+
 @app.route('/set_username', methods=['POST'])
-def oniset_name():
+def on_set_name():
     print 'Set username', request.form
 
     if len(request.form['username']) == 0:
