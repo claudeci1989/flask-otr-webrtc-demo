@@ -1,5 +1,4 @@
 import datetime
-import flask
 import json
 import thread
 import time
@@ -50,6 +49,7 @@ class WebRTCUser(object):
     username = None
     connected_at = None
     namespace = None
+    is_using_otr = False
 
     def __init__(self, id, username=None):
         self.id = id
@@ -73,6 +73,10 @@ class WebRTCUser(object):
         if payload != '{"event": "heartbeat"}':
             print 'Emitting %s to %s' % (payload, self)
         self.messages.put_nowait(payload)
+
+    def emit_to_rooms(self, event, **data):
+        for room in self.rooms:
+            room.emit(event, **data)
 
     def to_JSON(self):
         return dict(
@@ -100,8 +104,7 @@ class WebRTCRoom(object):
         self.users.append(user)
         user.rooms.append(self)
         print user.id
-        self.emit('user_join', 
-            exclude=user.id,
+        self.emit('user_join', _exclude=user.id,
             username=user.username,
             room=self.name)
 
@@ -109,17 +112,16 @@ class WebRTCRoom(object):
         try:
             self.users.remove(user)
             user.rooms.remove(self)
-            self.emit('user_leave', dict(
+            self.emit('user_leave', _exclude=user.id,
                 disconnect=disconnect,
-                username=user.username
-            ), exclude=user.id)
+                username=user.username)
         except:
             pass
 
     def emit(self, event, **data):
         data['event'] = event
         payload = json.dumps(data)
-        exclude = data.pop('exclude', None)
+        exclude = data.pop('_exclude', None)
         print 'Room %s emitting %s to %s exlcuding %s' % (self.name, payload, self.users, exclude)
         for user in self.users:
             if exclude and user.id == exclude:
@@ -171,6 +173,10 @@ def event_stream(stream_id):
     except:
         print 'Error sending hello to %s' % stream_id
         connected = False
+        print 'Stream %s is disconnected' % stream_id
+        rtc.disconnected(stream_id)
+        return
+
     while connected:
         #print 'Waiting for a message to send to %s' % stream_id
         message = user.messages.get(block=True, timeout=None)
@@ -197,10 +203,15 @@ thread.start_new_thread(heartbeat, (heartbeat_interval,))
 @app.before_request
 def before_request():
     stream_id = None
+    user = None
     if 'X-Stream-ID' in request.headers:
         stream_id = request.headers['X-Stream-ID']
-    print 'before_request', stream_id
+        if stream_id in rtc.users:
+            user = rtc.users[stream_id]
     setattr(request, 'stream_id', stream_id)
+    setattr(request, 'webrtc_user', user)
+
+
 
 @app.route('/')
 def index():
@@ -219,33 +230,43 @@ def stream():
 def debug():
     return render_template('debug.html', rtc=rtc)
 
+@app.route('/otr_on', methods=['POST'])
+def on_otr_on():
+    print 'OTR on', request.webrtc_user
+    if request.webrtc_user and not request.webrtc_user.is_using_otr:
+        request.webrtc_user.is_using_otr = True 
+    return jsonify(success=True)
+
+@app.route('/otr_off', methods=['POST'])
+def on_otr_off():
+    print 'OTR off', request.webrtc_user
+    if request.webrtc_user and request.webrtc_user.is_using_otr:
+        requset.webrtc_user.is_using_otr = False
+    return jsonify(success=True)
+
 @app.route('/set_username', methods=['POST'])
-def oniset_name():
+def on_set_name():
     print 'Set username', request.form
 
     if len(request.form['username']) == 0:
+        # TODO: more name validation
         return jsonify(dict(
             error='Invalid username',
             username=request.form['username']
         ))
 
     # Verify username is not alread in use
-    """
     for id in rtc.users:
         user = rtc.users[id]
         if user.username == request.form['username'] and \
-           user.id != rtc.socket_id:
-            emit('set_username_error', dict(
-                error='Username already in use',
-                username=request.form['username']
-            ))
+           user.id != request.stream_id:
             return jsonify(error='Username already in use', _status=400)
-    """
 
     user = rtc.get_current_user()
 
     if not user:
-        return jsonify(_status=400)
+        return jsonify(error="Missing or invalid X-Stream-ID header", 
+            _status=400)
     
     old_username = user.username
     if old_username:
@@ -260,11 +281,11 @@ def oniset_name():
 
     return jsonify(success=True)
 
-
 @app.route('/join_room', methods=['POST'])
 def on_join_room():
     """Join a webRTC room"""
     print 'join_room', request.form
+    # TODO: room name validation
     room = rtc.get_room(request.form['room'])
     user = rtc.get_current_user()
     room.user_join(user)
