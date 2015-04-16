@@ -121,10 +121,10 @@
      * Connects to the SSE source.
      */
     rtc.connect = function(stream_url) {
-        console.log('connecting to server')
         // Connect to server
         rtc.stream = new EventSource(stream_url);
         rtc.stream_url = stream_url;
+        rtc.fire('connecting');
 
         rtc.stream.onmessage = function(event) {
             var data = JSON.parse(event.data);
@@ -230,44 +230,40 @@
         return pc; 
     }
 
+    /*
+     * Creates a dataChannel instance for a peer.
+     */
     rtc.create_data_channel = function(username, label) {
-
-        var pc = rtc.peerConnections[username];
         console.log('creating data channel for '+username)
-        // need a label
-        var label = label || 'fileTransfer' || String(username);
+        var pc = rtc.peerConnections[username];
+        var label = label || String(username); // need a label
 
         if (rtc.dataChannelSupport == reliable_false) {
-            return; /* we only support reliability true options = {reliable: false};  */
-        } else {
-            options = {reliable: true}; /* reliability true!! */
-        }
+            return; 
+        } 
+        /* else reliability true! */
     
         try {
-            console.log('createDataChannel ' + username);
-            channel = pc.createDataChannel(label, options);
+            channel = pc.createDataChannel(label, { reliable: true });
         } catch (error) {
-            console.log('seems that DataChannel is NOT actually supported!');
+            rtc.fire('data_stream_error', username, error)
             throw error;
         }
-
-        
         return rtc.add_data_channel(username, channel);
     };
 
+    /*
+     * Adds callbacks to a dataChannel and stores the dataChannel.
+     */
     rtc.add_data_channel = function(username, channel) {
         channel.onopen = function() {
             channel.binaryType = 'arraybuffer';
-            console.log('data stream open ' + username);
-            console.log(channel);
             rtc.connected[username] = true;
             rtc.fire('data_stream_open', username);
         };
 
         channel.onclose = function(event) {
             delete rtc.dataChannels[username];
-            console.log('data stream close ' + username);
-            console.log(event);
             rtc.fire('data_stream_close', username, channel);
         };
 
@@ -278,17 +274,18 @@
             rtc.fire('data_stream_data', username, message);
         };
 
-        channel.onerror = function(err) {
-            console.log('data stream error ' + username + ': ' + err);
-            rtc.fire('data_stream_error', channel, err);
+        channel.onerror = function(error) {
+            rtc.fire('data_stream_error', username, error);
         };
 
-        // track dataChannel
         rtc.dataChannels[username] = channel;
         rtc.fire('add_data_channel', username, channel)
         return channel;
     }
 
+    /*
+     * Send intial WebRTC peerConnection offer.
+     */
     rtc.send_offer = function(username) {
         var pc = rtc.peerConnections[username];
 
@@ -303,7 +300,7 @@
 
             rtc.emit('send_offer', {
                 username: username,
-                sdp: JSON.stringify(session_description)
+                    sdp: JSON.stringify(session_description)
             });
             rtc.fire('send_offer', username);
         }, function(e) {
@@ -311,6 +308,9 @@
         });
     }
 
+    /*
+     * Receive intial WebRTC peerConnection offer.
+     */
     rtc.receive_offer = function(username, sdp) {
         var pc = rtc.peerConnections[username];
         var sdp_reply = new SessionDescription(JSON.parse(sdp));
@@ -323,6 +323,9 @@
         });
     }
 
+    /* 
+     * Send WebRTC peerConnection answer back to user who sent offer.
+     */
     rtc.send_answer = function(username) {
         var pc = rtc.peerConnections[username];
         
@@ -342,6 +345,9 @@
         }); 
     }
 
+    /*
+     * The user who sent original WebRTC offer receives final answer.
+     */
     rtc.receive_answer = function(username, sdp_in) {
         var pc = rtc.peerConnections[username];
         var sdp = new SessionDescription(sdp_in);
@@ -380,6 +386,13 @@
         document.getElementById(dom_id).src = window.URL.createObjectURL(stream);
     }
 
+    rtc.send = function(username, message) {
+        if (rtc.is_using_otr)
+            rtc.send_otr_message(username, message);
+        else
+            rtc.dataChannels[username].send(message)
+    }
+
     rtc.join_room = function(room) {
         rtc.room = room;
         if (rtc.connected)
@@ -398,7 +411,7 @@
                     rtc.fire('set_username_success');
                 })
                 .fail(function(e) {
-                    rtc.fire('set_username_error', data)
+                    rtc.fire('set_username_error', e)
                 })
             ;
     }
@@ -684,17 +697,18 @@
             return;
         
         var input = buffer_input.value;
+        $(buffer_input).val('')
+        setTimeout(function() {
+            $(buffer_input).val('')
+        },1);
         if (input.length > 0 && input[0] === '/') {
             var command = input.match(/\/(\w+) (.*)/);
             command_lookup[command[1]](command[2]);
         }
         event.preventDefault();
-        setTimeout(function() {
-            buffer_input.value = '';
-        },1);
         return false;
     });
 
     window.rtc = rtc;
-    rtc.connect(document.location.origin + '/stream')
+    rtc.connect(document.location.origin + '/stream');
 })()
