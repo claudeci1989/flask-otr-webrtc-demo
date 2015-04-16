@@ -504,10 +504,17 @@
         rtc.receive_answer(data.username, JSON.parse(data.sdp));
         //rtc.fire('receive answer', data);
     })
-    ;
+    .on('data_stream_open', function(username) {
+        rtc.go_otr_with(username);
+    })
+    .on('data_stream_data', function(username, data) {
+        if (rtc.is_using_otr) {
+            rtc.receive_otr_message(username, data);
+        } else {
 
-    window.addEventListener('beforeunload', function(event) {
-    });
+        }
+    })
+    ;
 
     rtc.dataChannelConfig = {optional: [ {'DtlsSrtpKeyAgreement': true} ] };
 
@@ -533,9 +540,277 @@
         }
     }
 
+    /**********
+     * Crypto *
+     **********/
+
+     // I am not a doctor.
+     rtc.otr_key;
+     rtc.crypto_streams = [];
+     rtc.crypto_receive_symmetric_keys = [];
+     rtc.crypto_send_symmetric_keys = [];
+     rtc.crypto_verified = [];
+     rtc.request_chunk_decrypt_rand = [];
+     rtc.hashed_message = [];
+
+     rtc.init_otr = function() {
+        rtc.fire('otr_init_begin');
+        setTimeout(function() {
+            rtc.otr_key = new DSA();
+            rtc.fire('otr_init_done');
+        }, 100);
+     }
+
+     rtc.go_otr_with = function(username) {
+        rtc.fire('go_otr_with', username);
+        var options = {
+            fragment_size: 1000,
+            priv: rtc.otr_key
+        }
+        rtc.crypto_verified[username] = false;
+        var otr_stream = rtc.crypto_streams[username] = new OTR(options);
+        otr_stream.ALLOW_V2 = false; /* We need V3 b/c we want the symmetric key generated for file transfers */
+        otr_stream.REQUIRE_ENCRYPTION = true;
+
+        otr_stream.on('ui', function(message, encrypted) {
+            if (encrypted) {
+                if(rtc.crypto_verified[username])
+                    rtc.packet_inbound(username, message);
+            } else {
+                console.error("Attempted to send non-encrypted message, not allowing to send!");
+            }
+        });
+
+        otr_stream.on('io', function(message) {
+            var channel =  rtc.dataChannels[username];
+            channel.send(message);
+        });
+
+        otr_stream.on('error', function(error) {
+            console.log(error)
+            rtc.fire('otr_stream_error', error);
+        })
+
+        otr_stream.on('status', function(state) {
+            if (state === OTR.CONST.STATUS_AKE_SUCCESS) {
+                rtc.fire('otr_ake_success', username);
+                console.log('AKE SUCCESS');
+                /* once we have AKE Success, do file transaction if we have not yet */
+                if (!rtc.crypto_send_symmetric_keys[username]) {
+                    /* Step 2) Send blank file to share symmetric crypto key */
+                    this.sendFile('test'); /* send a non-real filename registering a pre-shared private key */
+                }
+            }
+
+            if (state === OTR.CONST.STATUS_END_OTR) {
+                rtc.fire('otr_disconnect', username);
+                console.error('OTR disconnect :(');
+            }
+
+        });
+
+        otr_stream.on('file', function(type, key, file) {
+            if (type === 'send') {
+                rtc.crypto_send_symmetric_keys[username] = key;
+                console.log('send message key: '+key);
+                rtc.fire('otr_send_key', username);
+            }else if (type === 'receive') {
+                rtc.crypto_receive_symmetric_keys[username] = key;
+                rtc.fire('otr_receive_key')
+                console.log('receive message key: '+key);
+            } else {
+                console.error('unrecognized otr file type: '+type);
+            }
+            
+            /* these are equal, so lets compare them to verify */
+            if (rtc.crypto_receive_symmetric_keys[username] && 
+                rtc.crypto_send_symmetric_keys[username]){
+                if (rtc.crypto_send_symmetric_keys[username] != rtc.crypto_receive_symmetric_keys[username]) {
+                    rtc.fire('otr_stream_error', 'non-matching crypto keys');
+                } else {
+                    /* if they are equal, then we can also want to verify identity using SMP */
+                    
+                    /* Step 3) Socialist Millionaire Protocol 
+                     * ONLY A SINGLE HOST CAN START THIS! 
+                     * We have no concept of host/initiator, so choose host with lowest ID to start 
+                     * Convert both usernames into an ID number.
+                     */
+                    var me = rtc.username.toID(); /* remove letters and -'s */
+                    var other = username.toID();
+                    console.log(me, other)
+                    if (parseInt(me,10) > parseInt(other,10)) {
+                        console.log("starting smpSecret, other user must respond for connection");
+                        this.smpSecret(rtc.otr_secret);
+                        rtc.fire('otr_start_smp');
+                    } else {
+                        console.log("waiting for other user to send SMP message out");
+                        rtc.fire('otr_wait_smp');
+                    }
+                }
+            }
+        });
+        
+        otr_stream.on('smp', function (type, data, act) {
+            switch (type) {
+                case 'question':
+                    console.log("Anwsering question: "+rtc.otr_secret);
+                    this.smpSecret(rtc.otr_secret);
+                break
+                case 'trust':
+
+                    if (!data){
+                        /* TODO - handle this better? */
+                        console.error("OTR NEGOATION FAILED!");
+                    }
+                    if (data){
+                        console.log("OTR Socialist Millionaire Protocol success.");
+                        rtc.fire('otr_with', username)
+                        /* Step 4) do not send messages until reached here! */
+                        rtc.crypto_verified[username] = true;
+                    }
+                break
+                case 'abort':
+                    /* TODO - handle this better? */
+                    console.error("OTR NEGOATION FAILED!");
+                default:
+                    console.log("type:"+type);
+                    throw new Error('Unknown type.');
+            }
+        });
+
+        otr_stream.sendQueryMsg();
+
+     }
+
+    rtc.send_otr_message = function(username, message) {
+        console.log('sending to %0: '.f(username), message);
+        if (rtc.crypto_verified[username]) {
+            rtc.crypto_streams[username].sendMsg(message.data);
+        }
+    }
+
+    rtc.receive_otr_message = function(username, message) {
+        console.log('receiving from %0: '.f(username), message);
+        rtc.crypto_streams[username].receiveMsg(message.data);
+    }
+
+    /***************
+     * Crypto-JS functions 
+     * note: we had to redefine CryptoJS's namespace to not conflict with OTR CryptoJS code. No other changes were made.
+     *      TODO - bring Rabbit's functionality into OTR's CryptoJS namespace
+     * decrpyt & encrypt: file chunks QUICKLY using CryptoJS's Rabbit stream cipher
+     * key: We are going to combine the symmetric key that was created during our OTR initiation with a randomly generated value.
+     * That second random bit is to avoid sending the the same encrypted text multiple times. As we're sending this random value over our OTR channel
+     * when we request a chunk, we should be able to assume it's safe to use.
+     ****************/
+
+    function generate_second_half_RC4_random() {
+        var wordArray = RabbitCryptoJS.lib.WordArray.random(128/8); /* want this to be fast, so let's just grab 128 bits */
+        return RabbitCryptoJS.enc.Base64.stringify(wordArray);
+    }
+
+    /* decrypt an inbound file peice */
+    function file_decrypt(username, message) {
+        if (rtc.crypto_verified[username]) {
+            hash = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); //console.log(hash);
+            
+            message = RabbitCryptoJS.Rabbit.decrypt(JSON.parse(message),
+                rtc.crypto_receive_symmetric_keys[username] + rtc.request_chunk_decrypt_rand[username])
+                .toString(CryptoJS.enc.Utf8);
+            process_binary(username, base64DecToArr(message).buffer, hash); /* send back a hash as well to send back to the original host with the next request */
+        }
+    }
+        
+    /* encrypt and send out a peice of a file */
+    function file_encrypt_and_send(username, message, additional_key, chunk_num) {
+        /* MUST have completed OTR first */
+        if (rtc.crypto_verified[username]) {
+            message = _arrayBufferToBase64(message);
+            message = JSON.stringify(RabbitCryptoJS.Rabbit.encrypt(message, rtc.crypto_send_symmetric_keys[username] + additional_key));
+            
+            if (chunk_num == 0) {
+                hashed_message[username] = [];
+            }
+            hashed_message[username][chunk_num] = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); //console.log(hashed_message[username][chunk_num]);
+            
+            /* This is the one other place we can send directly! */
+            var channel = rtc.dataChannels[username];
+            if (rtc.connection_ok_to_send[username]) {
+                channel.send(message);
+            } else {
+                console.error("somehow downloading encrypted file without datachannel online?");
+            }
+        }
+    }
+
+    /* check if the previous hash sent back matches up */
+    function check_previous_hash(username, chunk_num, hash) {
+        if (chunk_num != 0) {
+            //console.log("hash comparing:"+hashed_message[username][chunk_num - 1]+" "+hash);
+            if (hashed_message[username][chunk_num - 1] == hash) {
+                return true; /* ok */
+            } else {
+                return false; /*not ok */
+            }
+        }
+        return true; /* skip for 1st chunk */
+    }
 
 
-    /*******************
+    /***************
+     * base 64 functionaility for crypto operations
+     ****************/
+
+    /* credit to http://stackoverflow.com/questions/9267899/arraybuffer-to-base64-encoded-string */
+    function _arrayBufferToBase64( buffer ) {
+        var binary = ''
+        var bytes = new Uint8Array( buffer )
+        var len = bytes.byteLength;
+        for (var i = 0; i < len; i++) {
+            binary += String.fromCharCode( bytes[ i ] )
+        }
+        return window.btoa( binary );
+    }
+
+    /* credit to https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8 */
+    function base64DecToArr (sBase64, nBlocksSize) {
+        var sB64Enc = sBase64.replace(/[^A-Za-z0-9\+\/]/g, ""), nInLen = sB64Enc.length;
+        var nOutLen = nBlocksSize ? Math.ceil((nInLen * 3 + 1 >> 2) / nBlocksSize) * nBlocksSize : nInLen * 3 + 1 >> 2;
+        var taBytes = new Uint8Array(nOutLen);
+
+        for (var nMod3, nMod4, nUint24 = 0, nOutIdx = 0, nInIdx = 0; nInIdx < nInLen; nInIdx++) {
+            nMod4 = nInIdx & 3;
+            nUint24 |= b64ToUint6(sB64Enc.charCodeAt(nInIdx)) << 18 - 6 * nMod4;
+            if (nMod4 === 3 || nInLen - nInIdx === 1) {
+                for (nMod3 = 0; nMod3 < 3 && nOutIdx < nOutLen; nMod3++, nOutIdx++) {
+                    taBytes[nOutIdx] = nUint24 >>> (16 >>> nMod3 & 24) & 255;
+                }
+                nUint24 = 0;
+            }
+        }
+        return taBytes;
+    }
+    function b64ToUint6 (nChr) {
+      return nChr > 64 && nChr < 91 ?
+          nChr - 65
+        : nChr > 96 && nChr < 123 ?
+          nChr - 71
+        : nChr > 47 && nChr < 58 ?
+          nChr + 4
+        : nChr === 43 ?
+          62
+        : nChr === 47 ?
+          63
+        :
+          0;
+    }
+
+    rtc.on('data_stream_open', function(username) {
+        rtc.go_otr_with(username);
+    })
+
+
+    /********************
      * DOM interactions *
      ********************/
 
