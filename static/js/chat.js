@@ -814,157 +814,176 @@
      * DOM interactions *
      ********************/
 
-    var status_div = document.getElementById('status');
+    var username_span = document.getElementById('username');
+    var user_icon = document.getElementById('user_icon');
+    var connection_status_div = document.getElementById('connection_status');
+    var connection_icon = document.getElementById('connection_icon');
     var messages_div = document.getElementById('messages');
-    var login_div = document.getElementById('login');
-    var login_buttom = document.getElementById('login_button');
-    var username_input = document.getElementById('username');
-    var mask_div = document.getElementById('mask');
     var buffer_input = document.getElementById('buffer_input');
 
-    var print = function(message) {
-        var message_div = document.createElement('div');
-        message_div.setAttribute('class','message');
-        message_div.innerHTML = message;
-        messages_div.appendChild(message_div);
-        messages.scrollTop = messages_div.scrollHeight;
+    var base_connection_icon = 'fa fa-circle ';
+
+    var levels = ['success', 'error', 'operation', 'info']
+    var print = {
+        out: function(message, type) {
+            var message_div = document.createElement('div');
+            message_div.setAttribute('class','message ' + type);
+            message_div.innerHTML = message;
+            messages_div.appendChild(message_div);
+            messages.scrollTop = messages_div.scrollHeight;
+        }
     }
+    rtc.print = print;
+    for (var x = 0; x < levels.length; x++)
+        print[levels[x]] = (function(level) { return function(message) { print.out(message, level)}})(levels[x]);
 
     rtc.on('connecting', function() {
-        status_div.innerHTML = 'Connecting...';
-        print('[*] Connecting to %0...'.f(rtc.socket_url));
+        connection_status_div.innerHTML = 'Connecting...';
+        connection_icon.setAttribute('class', base_connection_icon + 'connecting');
+        print.operation('Connecting to %0...'.f(rtc.stream_url));
     })
 
     .on ('connect', function() {
-        status_div.innerHTML = 'Connected';
-        print('[*] Connected.');
-        if (!rtc.username) {
-            print('[-] Please set your username with the /nick command.');
-            buffer_input.value = '/nick ';
-        }
+        connection_status_div.innerHTML = 'Connected';
+        connection_icon.setAttribute('class', base_connection_icon + 'online');
+        print.success('Connected.');
+        print.info('Set your username with the %0 command.'.f('/nick'.bold()));
+        print.info('Set OTR encryption with %0 command.'.f('/secret'.bold()));
+        print.info('Join a chatroom with the %0 command.'.f('/join'.bold()));
+    })
+
+    .on('disconnect', function() {
+        connection_status_div.innerHTML = 'Disconnected';
+        connection_icon.setAttribute('class', base_connection_icon + 'offline');
     })
 
     .on ('set_username_success', function() {
-        print('[+] Username successfully set.');
-        if (!rtc.room) {
-            print('[-] Type the name of a room to join with the /join command.');
-            buffer_input.value = '/join ';
-        }
+        print.success('Username successfully set to %0.'.f(rtc.username.bold()));
+        username_span.innerHTML = rtc.username;
     })
 
     .on ('set_username_error', function(data) {
-        print('[-] Failed to set username: %0.'.f(data.error));
+        print.error('Failed to set username: %0.'.f(data.error));
         buffer_input.value = '/nick ' + data.username;
+    })
+
+    .on('set_secret', function() {
+        $(user_icon).fadeOut(function() { 
+            user_icon.setAttribute('class', 'fa ' + 
+                (rtc.is_using_otr ? 'fa-user-secret' : 'fa-user'));
+            $(user_icon).fadeIn(); 
+        });
     })
 
     .on ('got_peers', function(data) {
         var room = rtc.rooms[data.room];
         
         if (room.first_connect)
-            print('[*] Entered ' + data.room);
+            print.info('Entered ' + data.room);
         
         if (room.usernames.length == 0) 
-            return print('[*] You are the only user in this room.');
+            return print.info('You are the only user in this room.');
         
         var users = '';
         for (var x = 0; x < room.usernames.length; x++) {
             console.log(room.usernames)
-            users += room.usernames[x] + ' ';
+            users += room.usernames[x].bold() + ' ';
         }
-        print('[*] Users in room: ' + users);
+        print.info('Users in room: ' + users);
 
     })
 
     .on ('user_join', function(data) {
-        print('[*] User %0 has joined.'.f(data.username.bold()))
+        console.log(data);
+        print.info('User %0 has joined.'.f(data.username.bold()));
     })
 
     // Send RTC offer
     .on('send_offer', function(username) {
-        print('[*] Sending RTC offer to %0...'.f(username.bold()))
+        print.operation('Sending RTC offer to %0...'.f(username.bold()));
     })
     .on('send_offer_error', function(username) {
-        print('[-] Failed to send RTC offer to %0.'.f(username.bold()))
+        print,error('Failed to send RTC offer to %0.'.f(username.bold()));
     })
 
     // Receive RTC offer
     .on ('receive_offer receive_answer', function(data) {
-        print('[+] Received RTC offer from %0.'.f(data.username.bold()))
+        print.success('Received RTC offer from %0.'.f(data.username.bold()));
     })
 
 
     // Set Local Description for RTC
     .on('set_local_description', function(username) {
-        print('[+] Set local description for %0.'.f(username.bold()))
+        print.success('Set local description for %0.'.f(username.bold()));
     })
     .on('set_local_description_error', function(username, error) {
-        print('[-] Failed to set local description for %0!'.f(username.bold()))
+        print,error('Failed to set local description for %0!'.f(username.bold()));
     }) 
 
     // set Remote Description for RTC
     .on('set_remote_description', function(username) {
-        print('[+] Set remote description for %0.'.f(username.bold()))
+        print.success('Set remote description for %0.'.f(username.bold()));
     })
     .on('set_remote_description_error', function(username, error) {
-        print('[-] Failed to set remote description for %0!'.f(username.bold()))
+        print,error('Failed to set remote description for %0!'.f(username.bold()));
     }) 
 
     .on('ice_candidate', function(username) {
-        print('[+] Received ICE Candidate for %0'.f(username.bold()))
+        print.success('Received ICE Candidate for %0'.f(username.bold()));
     })
 
     /* PeerConnection Events */
     .on('peer_connection_opened', function(username) {
-        print('[+] Peer connection opened for %0'.f(username.bold()));
+        print.success('Peer connection opened for %0'.f(username.bold()));
     })
     .on('add_remote_stream', function(username) {
-        print('[+] Remote stream added for %0'.f(username.bold()))
+        print.success('Remote stream added for %0'.f(username.bold()));
     })
     .on('pc_error', function(username, e) {
-        print('[-] PeerConnection error when coonecting with %0'.f(username.bold()));
+        print.error('PeerConnection error when coonecting with %0'.f(username.bold()));
     })
 
     /* Data Stream Events */
     .on('add_data_channel', function(username) {
-        print('[*] DataChannel starting for %0...'.f(username.bold()));
+        print.operation('DataChannel starting for %0...'.f(username.bold()));
     })
     .on('data_stream_open', function(username) {
-        print('[+] DataChannel opened for %0.'.f(username.bold()));
+        print.success('DataChannel opened for %0.'.f(username.bold()));
     })
     .on('data_stream_close', function(username, channel) {
-        print('[-] DataChannel closed for %0.'.f(username.bold()));
+        print.error('DataChannel closed for %0.'.f(username.bold()));
     })
 
-
-    .on('disconnect', function() {
-        status_div.innerHTML = 'Disconnected';
+    /* OTR */
+    .on('otr_init_begin', function() {
+        print.operation('Creating OTR key, this may freeze your browser and take a moment...');
+    })
+    .on('otr_init_done', function() {
+        print.success('OTR key created successfully.');
+    })
+    .on('go_otr_with', function(username) {
+        print.operation('Establishing secure connection to go OTR with %0...'.f(username.bold()));
+    })
+    .on('otr_with', function(username) {
+        print.success('OTR with %0, you may now safely communicate.'.f(username.bold()));
+    })
+    .on('failed_to_go_otr_with', function(username) {
+        print.error('Failed to go OTR with %0.'.f(username.bold()));
+    })
+    .on('otr_stream_error', function(username, error) {
+        print.error('OTR Stream error for %0: %1'.f(username.bold()));
     })
     ;
 
-    login_button.addEventListener('click', function() {
-        var username = username_input.value;
-        rtc.set_username(username);
-        mask_div.setAttribute('style', '');
-        login_div.setAttribute('style', '');
-
-    });
-
     var command_lookup = {
-        connect: function(server_and_nick) {
-            var split = server_and_nick.split(' ');
-            var server = split[0]
-            var nick = split[1] 
+        connect: function(server) {
             if (!/^(http:\/\/|https:\/\/)/.test(server))
                 server = 'http://' + server;
             rtc.connect(server + '/stream');
         },
-        nick: function(username) {
-            rtc.set_username(username);
-        },
-        join: function(room) {
-            console.log('joing ' + room)
-            rtc.join_room(room);
-        }
+        nick: rtc.set_username, 
+        join: rtc.join_room,
+        secret: rtc.set_secret
     }
 
     buffer_input.addEventListener('keydown', function(event) {
