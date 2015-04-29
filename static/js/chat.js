@@ -659,8 +659,8 @@
                 case 'trust':
 
                     if (!data){
-                        /* TODO - handle this better? */
                         console.error("OTR NEGOATION FAILED!");
+                        rtc.fire('otr_failed', username, 'negotiation error');
                     }
                     if (data){
                         console.log("OTR Socialist Millionaire Protocol success.");
@@ -672,9 +672,12 @@
                 case 'abort':
                     /* TODO - handle this better? */
                     console.error("OTR NEGOATION FAILED!");
+                    rtc.fire('otr_failed', username, 'negotiation was aborted');
+                break;
                 default:
                     console.log("type:"+type);
-                    throw new Error('Unknown type.');
+                    rtc.fire('otr_failed', username, 'unknown error');
+                break;
             }
         });
 
@@ -972,6 +975,9 @@
     })
     .on('otr_stream_error', function(username, error) {
         print.error('OTR Stream error for %0: %1'.f(username.bold()));
+    })
+    .on('otr_failed', function(username, error) {
+        print.error('Failed to establish OTR channel with %0: %1.'.f(username.bold(), error));
     })
     ;
 
