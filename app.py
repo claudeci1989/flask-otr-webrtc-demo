@@ -122,7 +122,8 @@ class WebRTCRoom(object):
         data['event'] = event
         payload = json.dumps(data)
         exclude = data.pop('_exclude', None)
-        print 'Room %s emitting %s to %s exlcuding %s' % (self.name, payload, self.users, exclude)
+        print 'Room %s emitting %s to %s exlcuding %s' % \
+            (self.name, payload, self.users, exclude)
         for user in self.users:
             if exclude and user.id == exclude:
                 continue
