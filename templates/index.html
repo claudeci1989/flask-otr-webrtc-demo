@@ -5,7 +5,7 @@
     <link rel="stylesheet" type="text/css" href="/static/vendor/fontawesome/css/font-awesome.css" />
     <style>
         body {
-            background: #111;
+            background: #272B30;
             color: #eee;
             font-family: Helvetica, Arial, sans-serif;
             font-size: 13px;
@@ -22,59 +22,35 @@
         }
         h1 {
             text-align: center;
+        } 
+        #app {
+            position: absolute;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         #header {
             position: absolute;
-            background: #222;
+            background: linear-gradient(#8A9196, #7A8288 60%, #70787D);
+            border-bottom: 1px solid #697075;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
             border-bottom: #000;
             left: 0;
             right: 0;
             top: 0;
-            height: 18px;
-            padding: 20px;
+            padding: 7px 10px;
         }
-        #status {
+        #connection {
             float: right;
         }
-        #chatbox {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-        #mask {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #000;
-            opacity: 0.3;
-            z-index: 1;
-            display: none;
-        }
-        #login {
-            background: #222;
-            border: 1px solid #000;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 260px;
-            height: 240px;
-            margin-left: -130px;
-            margin-top: -121px;
-            border-radius: 3px;
-            z-index: 2;
-            text-align: center;
-            display: none;
-        }
-        #login > div {
-            padding: 5px 0;
+        #user {
+            float: left;
         }
         #messages {
             position: absolute;
-            top: 76px;
+            top: 45px;
             left: 0;
             right: 0;
             bottom: 27px;
@@ -82,34 +58,52 @@
         }
         #buffer {
             position: absolute;
-            bottom: 2px;
+            bottom: 0px;
             left: 0;
-            right: 0;
-            height: 26px;
+            right: 12px;
         }
         textarea {
             width: 100%;
-            height: 100%;
+            height: 15px;
             padding: 5px;
             resize: none;
         }
+        #user_icon {
+            font-size: 25px;
+        }
+        #connection {
+            padding-top: 3px;
+        }
+        #connection_icon {
+            font-size: 16px;
+        }
+        #connection_status {
+            vertical-align: middle;
+            display: inline-block;
+        }
+        .fa {
+            vertical-align: middle;
+        }
+        .online {
+            color: green;
+        }
+        .offline {
+            color: #666;
+        }
+
     </style> 
 </head>
 <body>
-    <div id="chatbox">
-        <div id="mask"></div>
-        <div id="login">    
-            <h1>Login</h1>
-            <div>
-                Please provide a username:
-                <input id="username" type="text" placeholder="Username" />
-            </div>
-            <div>
-                <input id="login_button" type="submit" value="Login" />
-            </div>
-        </div>
+    <div id="app">
         <div id="header">
-            <div id="status">Not connected</div>
+            <div id="user">
+                <span id="user_icon" class="fa fa-user"></span>
+                <span id="username">Anonymous</span>
+            </div>
+            <div id="connection">
+                <span id="connection_icon" class="fa fa-circle offline"></span>
+                <span id="connection_status">Not connected</span>
+            </div>
         </div>
         <div id="messages"></div>
         <div id="buffer">
