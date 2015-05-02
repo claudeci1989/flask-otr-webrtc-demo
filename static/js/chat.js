@@ -387,10 +387,9 @@
     }
 
     rtc.send = function(username, message) {
-        if (rtc.is_using_otr)
-            rtc.send_otr_message(username, message);
-        else
-            rtc.dataChannels[username].send(message)
+        if (!rtc.is_using_otr)
+            return rtc.fire('error_sending_not_otr');
+        rtc.send_otr_message(username, message);
     }
 
     rtc.join_room = function(room) {
