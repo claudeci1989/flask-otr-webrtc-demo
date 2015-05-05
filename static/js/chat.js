@@ -397,7 +397,8 @@
         if (rtc.connected)
             rtc.emit('join_room', { room: room, encryption: null })
                 .done(function(json) {
-                    rtc.fire('get_peers', json);
+                    rtc.fire('joined_room', room)
+                       .fire('get_peers', json);
                 })
         ;
     }
@@ -415,7 +416,7 @@
             ;
     }
 
-    /* WebRTC Callbacks */
+    /* WebRTC SSE Callbacks */
     rtc.on('connect', function() {
         console.log('connected');
         rtc.connected = true;
