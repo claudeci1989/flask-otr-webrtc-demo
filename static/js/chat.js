@@ -979,6 +979,9 @@
     .on('otr_failed', function(username, error) {
         print.error('Failed to establish OTR channel with %0: %1.'.f(username.bold(), error));
     })
+    .on('error_sending_not_otr', function() {
+        print.error('Message not sent because you have not gone OTR yet.');
+    })
     ;
 
     var command_lookup = {
