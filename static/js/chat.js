@@ -460,23 +460,25 @@
     .on('get_peers', function(data) {
         console.log('get_peers');
         console.log(data);
-
+        var usernames = [];
         /* we already sanitize everything later, but rather be safe than sorry */
-        for (var i = 0, len = data.usernames.length; i < len; i++) {
-            data.usernames[i] = data.usernames[i].sanitize();
-            rtc.create_peer_connection(data.usernames[i]);
-            rtc.create_data_channel(data.usernames[i]);
-            rtc.send_offer(data.usernames[i]);
+        for (var i = 0, len = data.users.length; i < len; i++) {
+            var user  = data.users[i];
+            var username = user.username = user.username.sanitize();
+            rtc.is_using_otr[username] = user.using_otr;
+            usernames.push(username);
+            rtc.create_peer_connection(username);
+            rtc.create_data_channel(username);
+            rtc.send_offer(username);
         }
-        rtc.rooms[data.room] = {
-            connections: data.connections,
-            usernames: data.usernames,
-            first_connect: true
-        }
+        rtc.usernames = usernames;
+        rtc.users = data.users;
+        
+        rtc.first_connect = true
        
         rtc.fire('got_peers', data);
 
-        rtc.rooms[data.room].first_connect = false;
+        rtc.first_connect = false;
     })
     
     .on('set_username_success', function(data) {
@@ -487,10 +489,9 @@
     .on('user_join', function(data) {
         //add username
         console.log(data.username+' has joined the room.', data);
-       /* rtc.usernames[data.username] = sanitize(data.username); */
-        var room = rtc.rooms[data.room];
-        //add socket and create streams
-        room.usernames.push(data.username);
+        /* rtc.usernames[data.username] = sanitize(data.username); */
+        // add socket and create streams
+        rtc.usernames.push(data.username);
         rtc.create_peer_connection(data.username);
         //rtc.create_data_channel(data.username);
         //rtc.send_offer(data.username);
@@ -529,13 +530,14 @@
         //rtc.fire('receive answer', data);
     })
     .on('data_stream_open', function(username) {
+        console.log('going otr with '+username)
         rtc.go_otr_with(username);
     })
     .on('data_stream_data', function(username, data) {
-        if (rtc.is_using_otr) {
+        if (rtc.is_using_otr[username]) {
             rtc.receive_otr_message(username, data);
         } else {
-
+             
         }
     })
     ;
@@ -573,8 +575,9 @@
      rtc.crypto_streams = [];
      rtc.crypto_receive_symmetric_keys = [];
      rtc.crypto_send_symmetric_keys = [];
-     rtc.crypto_verified = [];
+     rtc.crypto_verified = {};
      rtc.request_chunk_decrypt_rand = [];
+     rtc.is_using_otr = {};
      rtc.hashed_message = [];
 
      rtc.init_otr = function() {
@@ -710,9 +713,9 @@
      }
 
     rtc.send_otr_message = function(username, message) {
-        console.log('sending to %0: '.f(username), message);
+        console.log('sending to %0: %1'.f(username, message));
         if (rtc.crypto_verified[username]) {
-            rtc.crypto_streams[username].sendMsg(message.data);
+            rtc.crypto_streams[username].sendMsg(message);
         }
     }
 
