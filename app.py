@@ -292,14 +292,17 @@ def on_join_room():
     room.user_join(user)
     data = dict(
         room=room.name,
-        usernames=[],
+        users=[],
         encryption=None
     )
     print room, room.users
     for patron in room.users:
 
         if patron.id != user.id:
-            data['usernames'].append(patron.username)
+            data['users'].append(dict(
+                username=patron.username,
+                using_otr=patron.is_using_otr
+            ))
 
     return jsonify(data)
 
