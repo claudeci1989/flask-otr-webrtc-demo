@@ -68,11 +68,13 @@
             padding: 5px;
             resize: none;
         }
-        #user_icon {
+        #user_icon,
+        #room .fa,
+        #settings_icon {
             font-size: 25px;
         }
-        #connection {
-            padding-top: 3px;
+        #room {
+            text-align: center;
         }
         #connection_icon {
             font-size: 16px;
@@ -103,6 +105,11 @@
             <div id="connection">
                 <span id="connection_icon" class="fa fa-circle offline"></span>
                 <span id="connection_status">Not connected</span>
+                <span id="settings_icon" class="fa fa-gear"></span>
+            </div>
+            <div id="room">
+                <span id="room_icon" class="fa fa-street-view"></span>
+                <span id="room_name">Lobby</span>
             </div>
         </div>
         <div id="messages"></div>
