@@ -845,6 +845,8 @@
 
     var username_span = document.getElementById('username');
     var user_icon = document.getElementById('user_icon');
+    var room_name = document.getElementById('room_name');
+    var room_icon = document.getElementById('room_icon');
     var connection_status_div = document.getElementById('connection_status');
     var connection_icon = document.getElementById('connection_icon');
     var messages_div = document.getElementById('messages');
@@ -876,9 +878,9 @@
         connection_status_div.innerHTML = 'Connected';
         connection_icon.setAttribute('class', base_connection_icon + 'online');
         print.success('Connected.');
-        print.info('Set your username with the %0 command.'.f('/nick'.bold()));
-        print.info('Set OTR encryption with %0 command.'.f('/secret'.bold()));
-        print.info('Join a chatroom with the %0 command.'.f('/join'.bold()));
+        print.info('Set your username with the %0 command. ex: %0 your_name'.f('/nick'.bold()));
+        print.info('Set OTR encryption with %0 command. ex: %0 something_secret'.f('/secret'.bold()));
+        print.info('Join a chatroom with the %0 command. ex: %0 the_meeting_spot'.f('/join'.bold()));
     })
 
     .on('disconnect', function() {
@@ -1039,19 +1041,25 @@
     }
 
     buffer_input.addEventListener('keydown', function(event) {
+
+        // Only capture returns
         if (event.keyCode != 13) 
             return;
+        event.preventDefault();
         
         var input = buffer_input.value;
         $(buffer_input).val('')
         setTimeout(function() {
             $(buffer_input).val('')
         },1);
-        if (input.length > 0 && input[0] === '/') {
+        if (input.length === 0)
+            return;
+        if (input[0] === '/') {
             var command = input.match(/\/(\w+) (.*)/);
             command_lookup[command[1]](command[2]);
+        } else {
+            rtc.send(input);
         }
-        event.preventDefault();
         return false;
     });
 
