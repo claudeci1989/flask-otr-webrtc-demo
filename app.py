@@ -242,7 +242,7 @@ def on_otr_on():
 def on_otr_off():
     print 'OTR off', request.webrtc_user
     if request.webrtc_user and request.webrtc_user.is_using_otr:
-        requset.webrtc_user.is_using_otr = False
+        request.webrtc_user.is_using_otr = False
     return jsonify(success=True)
 
 @app.route('/set_username', methods=['POST'])
