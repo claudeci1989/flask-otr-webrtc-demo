@@ -91,11 +91,10 @@
         streams: [],
         socket: null, // Web socket
         connected: false,
-        rooms: {},
         me: null, // ID f this connection
         room: null,
         _events: {}, // Event callbacks
-        is_using_otr: false
+        using_otr: false
     };
 
     /*
@@ -372,9 +371,9 @@
     }
 
     rtc.set_secret = function(secret) {
-        rtc.is_using_otr = !!secret;
+        rtc.using_otr = !!secret;
         rtc.otr_secret = secret;
-        if (rtc.is_using_otr) {
+        if (rtc.using_otr) {
             rtc.init_otr();
         }
         rtc.emit(secret? 'otr_on' : 'otr_off')
