@@ -21,6 +21,10 @@
         strings.bold = function() {
             return "<strong>%0</strong>".f(this);
         }
+        /*
+         * Converts a string into a unique number based off the sum of the 
+         * character code values of each character.
+         */
         strings.toID = function() {
             var id = 0;
             for (var x = 0; x < this.length; x++) 
@@ -70,6 +74,12 @@
     var rtc_unsupported = 0;
     var reliable_false  = 1;
     var reliable_true   = 2;
+
+    var sent_no_otr   = 0;
+    var sent_some_otr = 1;
+    var sent_all_otr  = 2;
+    var received      = 0;
+    var received_otr  = 2;
 
     var rtc = {
         STUN_SERVERS: { // STUN/ICE server(s) to use for PeerConnections
@@ -386,10 +396,19 @@
         document.getElementById(dom_id).src = window.URL.createObjectURL(stream);
     }
 
-    rtc.send = function(username, message) {
-        if (!rtc.is_using_otr)
-            return rtc.fire('error_sending_not_otr');
-        rtc.send_otr_message(username, message);
+    rtc.send = function(message) {
+        var status = sent_all_otr;
+        var otr_sent = 0;
+        for (var x = 0; x < rtc.usernames.length; x++) {
+            var username = rtc.usernames[x];
+            if (rtc.crypto_verified[username]) {
+                rtc.send_otr_message(username, message);
+                otr_sent++;
+            }
+            else 
+                rtc.dataChannels[username].send(message);
+        }
+        rtc.fire('message', rtc.username, message.sanitize(), sent_all_otr);
     }
 
     rtc.join_room = function(room) {
@@ -873,32 +892,49 @@
     .on('set_secret', function() {
         $(user_icon).fadeOut(function() { 
             user_icon.setAttribute('class', 'fa ' + 
-                (rtc.is_using_otr ? 'fa-user-secret' : 'fa-user'));
+                (rtc.using_otr ? 'fa-user-secret' : 'fa-user'));
             $(user_icon).fadeIn(); 
         });
     })
 
+    .on('joined_room', function() {
+        $(room_icon).fadeOut(function() { 
+            room_icon.setAttribute('class', 'fa fa-users');
+            $(room_icon).fadeIn(); 
+        });
+        $(room_name).html(rtc.room);
+    })
+
     .on ('got_peers', function(data) {
-        var room = rtc.rooms[data.room];
         
-        if (room.first_connect)
-            print.info('Entered ' + data.room);
         
-        if (room.usernames.length == 0) 
+        if (rtc.first_connect)
+            print.info('Entered ' + rtc.room);
+        
+        if (rtc.usernames.length == 0) 
             return print.info('You are the only user in this room.');
         
         var users = '';
-        for (var x = 0; x < room.usernames.length; x++) {
-            console.log(room.usernames)
-            users += room.usernames[x].bold() + ' ';
+        for (var x = 0; x < rtc.usernames.length; x++) {
+            console.log(rtc.usernames)
+            users += rtc.usernames[x].bold() + ' ';
         }
         print.info('Users in room: ' + users);
 
     })
 
     .on ('user_join', function(data) {
-        console.log(data);
         print.info('User %0 has joined.'.f(data.username.bold()));
+    })
+
+    .on ('message', function(username, message, otr_status) {
+        var $message = $(
+            '<div class="message">' +
+                '<span class="fa fa-lock"></span>' +
+                '<span class="chat-user">%0:</span>'.f(username.bold()) +
+                '<span class="message-inner">%0</span>'.f(message) +
+            '</div>'
+        ).appendTo(messages_div);
     })
 
     // Send RTC offer
