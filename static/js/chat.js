@@ -435,6 +435,11 @@
             ;
     }
 
+    rtc.packet_inbound = function(username, message) {
+        message = message.sanitize();
+        rtc.fire('message', username, message, true);
+    }
+
     /* WebRTC SSE Callbacks */
     rtc.on('connect', function() {
         console.log('connected');
