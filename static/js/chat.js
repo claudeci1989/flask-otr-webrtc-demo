@@ -556,11 +556,12 @@
      rtc.hashed_message = [];
 
      rtc.init_otr = function() {
-        rtc.fire('otr_init_begin');
-        setTimeout(function() {
-            rtc.otr_key = new DSA();
+        var key_worker = new Worker('/static/js/dsa-webworker.js?' + new Date().getTime());
+        key_worker.onmessage = function(e) {
+            rtc.otr_key = e.data.val;
             rtc.fire('otr_init_done');
-        }, 100);
+        }
+        key_worker.postMessage({seed: '' + new Date().getTime()});
      }
 
      rtc.go_otr_with = function(username) {

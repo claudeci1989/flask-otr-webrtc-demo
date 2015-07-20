@@ -1,8 +1,8 @@
 ;(function (root) {
   "use strict";
 
-  root.OTR = {}
-  root.DSA = {}
+  //root.OTR = {}
+  //root.DSA = {}
   root.crypto = {
     randomBytes: function () {
       throw new Error("Haven't seeded yet.")
@@ -11,13 +11,11 @@
 
   // default imports
   var imports = [
-      'vendor/salsa20.js'
-    , 'vendor/bigint.js'
-    , 'vendor/crypto.js'
-    , 'vendor/eventemitter.js'
-    , 'lib/const.js'
-    , 'lib/helpers.js'
-    , 'lib/dsa.js'
+      '/static/vendor/otr/dep/salsa20.js'
+    , '/static/vendor/otr/dep/bigint.js'
+    , '/static/vendor/otr/dep/crypto.js'
+    , '/static/vendor/otr/dep/eventemitter.js'
+    , '/static/vendor/otr/otr.min.js'
   ]
 
   function sendMsg(type, val) {
@@ -46,7 +44,7 @@
     }
     if (data.debug) sendMsg('debug', 'DSA key creation finished')
 
-    sendMsg('data', dsa.packPrivate())
+    sendMsg('data', dsa)
   }
 
 }(this))
