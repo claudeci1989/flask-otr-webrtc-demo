@@ -239,9 +239,7 @@
      */
     rtc.send_offer = function(username) {
         var pc = rtc.peerConnections[username];
-
         pc.createOffer( function(session_description) {
-
             //description callback? not currently supported - http://www.w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
             pc.setLocalDescription(session_description, function() { 
                 rtc.fire('set_local_description', username);
@@ -264,9 +262,7 @@
      */
     rtc.receive_offer = function(username, sdp) {
         var pc = rtc.peerConnections[username];
-        console.log(sdp);
         var sdp_reply = new SessionDescription(JSON.parse(sdp));
-        rtc.fire('receive_offer', username, sdp);
         pc.setRemoteDescription(sdp_reply, function () {
             /* setRemoteDescription success */
             rtc.send_answer(username);
@@ -303,8 +299,7 @@
      */
     rtc.receive_answer = function(username, sdp_in) {
         var pc = rtc.peerConnections[username];
-        var sdp = new SessionDescription(sdp_in);
-        rtc.fire('receive_answer', username, sdp_in)
+        var sdp = new SessionDescription(JSON.parse(sdp_in));
         pc.setRemoteDescription(sdp, function() { 
             rtc.fire('set_remote_description', username);
         },function(err) {
@@ -482,7 +477,7 @@
        }
     })
 
-    .on('remove_peer_connected', function(data) { /// TODO: ???
+    .on('remove_peer_connected', function(data) { 
         rtc.connected[data.username] = false;
         rtc.fire('disconnect stream', data.username, rtc.usernames[data.username]);
         delete rtc.dataChannels[data.username];
@@ -493,21 +488,16 @@
     .on('receive_ice_candidate', function(data) {
         var candidate = new iceCandidate(JSON.parse(data.candidate));
         rtc.peerConnections[data.username].addIceCandidate(candidate);
-        //rtc.fire('receive_ice_candidate', candidate);
     })
 
-    .on('receive_offer', function(data) { // TODO: ???
+    .on('receive_offer', function(data) { 
         rtc.receive_offer(data.username, data.sdp);
-        //rtc.fire('receive offer', data);    
     })
 
     .on('receive_answer', function(data) {
-        rtc.receive_answer(data.username, JSON.parse(data.sdp));
-        //rtc.fire('receive answer', data);
+        rtc.receive_answer(data.username, data.sdp);
     })
-    .on('data_stream_open', function(username) {
-        rtc.go_otr_with(username);
-    })
+
     .on('data_stream_data', function(username, data) {
         if (rtc.is_using_otr[username]) {
             rtc.receive_otr_message(username, data);
@@ -525,7 +515,6 @@
         var pc = new PeerConnection(rtc.STUN_SERVERS, rtc.dataChannelConfig);
         channel = pc.createDataChannel('supportCheck', { reliable: true }); 
         channel.close();
-        console.log('data channel reliability set to true!');
         rtc.dataChannelSupport = reliable_true;
     } catch(e) {    
         try {
@@ -533,7 +522,6 @@
             var pc = new PeerConnection(rtc.STUN_SERVERS, rtc.dataChannelConfig);
             channel = pc.createDataChannel('supportCheck', { reliable: false }); 
             channel.close();
-            console.log('data channel reliability set to false!');
             rtc.dataChannelSupport = reliable_false;
         } catch(e) {
             /* then fail :( */
@@ -580,24 +568,21 @@
                 if(rtc.crypto_verified[username])
                     rtc.packet_inbound(username, message);
             } else {
-                console.error("Attempted to send non-encrypted message, not allowing to send!");
+                // Attempted to send non-encrypted message, not allowing to send!
             }
         });
 
         otr_stream.on('io', function(message) {
-            var channel =  rtc.dataChannels[username];
-            channel.send(message);
+            rtc.dataChannels[username].send(message);
         });
 
         otr_stream.on('error', function(error) {
-            console.log(error)
-            rtc.fire('otr_stream_error', error);
+            rtc.fire('otr_stream_error', username, error);
         })
 
         otr_stream.on('status', function(state) {
             if (state === OTR.CONST.STATUS_AKE_SUCCESS) {
                 rtc.fire('otr_ake_success', username);
-                console.log('AKE SUCCESS');
                 /* once we have AKE Success, do file transaction if we have not yet */
                 if (!rtc.crypto_send_symmetric_keys[username]) {
                     /* Step 2) Send blank file to share symmetric crypto key */
@@ -607,7 +592,6 @@
 
             if (state === OTR.CONST.STATUS_END_OTR) {
                 rtc.fire('otr_disconnect', username);
-                console.error('OTR disconnect :(');
             }
 
         });
@@ -615,14 +599,12 @@
         otr_stream.on('file', function(type, key, file) {
             if (type === 'send') {
                 rtc.crypto_send_symmetric_keys[username] = key;
-                console.log('send message key: '+key);
                 rtc.fire('otr_send_key', username);
             }else if (type === 'receive') {
                 rtc.crypto_receive_symmetric_keys[username] = key;
-                rtc.fire('otr_receive_key')
-                console.log('receive message key: '+key);
+                rtc.fire('otr_receive_key', username)
             } else {
-                console.error('unrecognized otr file type: '+type);
+                rtc.fire('otr_file_error', username, type);
             }
             
             /* these are equal, so lets compare them to verify */
@@ -640,14 +622,11 @@
                      */
                     var me = rtc.username.toID(); /* remove letters and -'s */
                     var other = username.toID();
-                    console.log(me, other)
                     if (parseInt(me,10) > parseInt(other,10)) {
-                        console.log("starting smpSecret, other user must respond for connection");
                         this.smpSecret(rtc.otr_secret);
-                        rtc.fire('otr_start_smp');
+                        rtc.fire('otr_smp_start', username);
                     } else {
-                        console.log("waiting for other user to send SMP message out");
-                        rtc.fire('otr_wait_smp');
+                        rtc.fire('otr_smp_wait', username);
                     }
                 }
             }
@@ -656,17 +635,14 @@
         otr_stream.on('smp', function (type, data, act) {
             switch (type) {
                 case 'question':
-                    console.log("Anwsering question: "+rtc.otr_secret);
                     this.smpSecret(rtc.otr_secret);
+                    rtc.fire('otr_smp_question', username);
                 break
                 case 'trust':
-
                     if (!data){
-                        console.error("OTR NEGOATION FAILED!");
-                        rtc.fire('otr_failed', username, 'negotiation error');
+                        rtc.fire('otr_smp_failed', type, username, 'negotiation error');
                     }
                     if (data){
-                        console.log("OTR Socialist Millionaire Protocol success.");
                         rtc.fire('otr_with', username)
                         /* Step 4) do not send messages until reached here! */
                         rtc.crypto_verified[username] = true;
@@ -674,12 +650,10 @@
                 break
                 case 'abort':
                     /* TODO - handle this better? */
-                    console.error("OTR NEGOATION FAILED!");
-                    rtc.fire('otr_failed', username, 'negotiation was aborted');
+                    rtc.fire('otr_smp_failed', username, type, 'negotiation was aborted');
                 break;
                 default:
-                    console.log("type:"+type);
-                    rtc.fire('otr_failed', username, 'unknown error');
+                    rtc.fire('otr_smp_failed', username, type, 'unknown error');
                 break;
             }
         });
@@ -689,14 +663,12 @@
      }
 
     rtc.send_otr_message = function(username, message) {
-        console.log('sending to %0: %1'.f(username, message));
         if (rtc.crypto_verified[username]) {
             rtc.crypto_streams[username].sendMsg(message);
         }
     }
 
     rtc.receive_otr_message = function(username, message) {
-        console.log('receiving from %0: '.f(username), message);
         rtc.crypto_streams[username].receiveMsg(message.data);
     }
 
@@ -718,7 +690,7 @@
     /* decrypt an inbound file peice */
     function file_decrypt(username, message) {
         if (rtc.crypto_verified[username]) {
-            hash = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); //console.log(hash);
+            hash = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); 
             
             message = RabbitCryptoJS.Rabbit.decrypt(JSON.parse(message),
                 rtc.crypto_receive_symmetric_keys[username] + rtc.request_chunk_decrypt_rand[username])
@@ -737,14 +709,13 @@
             if (chunk_num == 0) {
                 hashed_message[username] = [];
             }
-            hashed_message[username][chunk_num] = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); //console.log(hashed_message[username][chunk_num]);
+            rtc.hashed_message[username][chunk_num] = CryptoJS.SHA256(message).toString(CryptoJS.enc.Base64); 
             
             /* This is the one other place we can send directly! */
-            var channel = rtc.dataChannels[username];
             if (rtc.connection_ok_to_send[username]) {
-                channel.send(message);
+                rtc.dataChannels[username].send(message);
             } else {
-                console.error("somehow downloading encrypted file without datachannel online?");
+                rtc.fire('error', '"somehow downloading encrypted file without datachannel online?');
             }
         }
     }
@@ -752,8 +723,7 @@
     /* check if the previous hash sent back matches up */
     function check_previous_hash(username, chunk_num, hash) {
         if (chunk_num != 0) {
-            //console.log("hash comparing:"+hashed_message[username][chunk_num - 1]+" "+hash);
-            if (hashed_message[username][chunk_num - 1] == hash) {
+            if (rtc.hashed_message[username][chunk_num - 1] == hash) {
                 return true; /* ok */
             } else {
                 return false; /*not ok */
@@ -892,8 +862,6 @@
     })
 
     .on ('got_peers', function(data) {
-        
-        
         if (rtc.first_connect)
             print.info('Entered ' + rtc.room);
         
@@ -902,11 +870,9 @@
         
         var users = '';
         for (var x = 0; x < rtc.usernames.length; x++) {
-            console.log(rtc.usernames)
             users += rtc.usernames[x].bold() + ' ';
         }
         print.info('Users in room: ' + users);
-
     })
 
     .on ('user_join', function(data) {
@@ -942,7 +908,7 @@
         print.success('Set local description for %0.'.f(username.bold()));
     })
     .on('set_local_description_error', function(username, error) {
-        print,error('Failed to set local description for %0!'.f(username.bold()));
+        print.error('Failed to set local description for %0!'.f(username.bold()));
     }) 
 
     // set Remote Description for RTC
