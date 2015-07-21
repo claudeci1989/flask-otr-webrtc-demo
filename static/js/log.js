@@ -18,6 +18,10 @@
 
     rtc
     
+    .on('error', function(error) {
+        log('[ERROR] ' + error);
+    })
+
     /* EventSource */
     .on('connect', function(stream_url) {
         log('Connected to ' + stream_url);
@@ -37,6 +41,9 @@
             !rtc.log_event_source_message)
             return;
         log('Event source message', event);
+    })
+    .on('hello', function() {
+        log('Got hello packet!');
     })
 
     /* PeerConnection */
@@ -88,7 +95,8 @@
         log('added DataChannel with %0 labeled "%1"'.f(username, label));
     })
     .on('data_channel_error', function(username, error) {
-        log('DataChannel error with ' + username, error))
+        log('DataChannel error with %0: %1'.f(username, error));
+    })
     .on('data_stream_open', function(username) {
         log('DataChannel opened for ' + username);
     })
@@ -99,7 +107,9 @@
         if (rtc.log_data_stream_data)
             log('received from %0: %1'.f(username, message));
     })
-    .on('')
+    .on('data_channel_reliable', function() {
+        log('Data channel reliability set to ')
+    })
 
     .on('set_secret', function() {
         log('OTR is ' + (rtc.using_otr ? 'on' : 'off'));
@@ -117,6 +127,52 @@
         log(data.username + ' has joined the room');
     })
 
+    /* OTR */
+    .on('otr_init_begin', function() {
+        log('[OTR] Init begin');
+    })
+    .on('otr_init_done', function() {
+        log('[OTR] Init done');
+    })
+    .on('going_otr_with', function(username) {
+        log('[OTR] Starting off the record with ' + username);
+    })
+    .on('otr_ake_success', function(username) {
+        log('[OTR] AKE success with ' + username);
+    })
+    .on('otr_disconnect', function(username) {
+        log('[OTR] Disconnect from ' + username);
+    })
+    .on('otr_send_key', function(username) {
+        log('[OTR] Sent key to ' + username);
+    })
+    .on('otr_receive_key', function(username) {
+        log('[OTR] Received key from ' + username)
+    })
+    .on('otr_smp_start', function(username) {
+        log('[OTR] Started SMP with ' + username);
+    })
+    .on('otr_smp_wait', function(username) {
+        log('[OTR] Waiting on SMP with ' + username);
+    })
+    .on('otr_smp_question', function(username) {
+        log('[OTR] Answering SMP question for ' + username);
+    })
+    .on('otr_smp_failed', function(username, type, error) {
+        log('[OTR] SMP failed with %0 during %1 with error: %2'.f(username, type, error));
+    })
+    .on('otr_with', function(username) {
+        log('[OTR] Successfully off the reocrd with ' + username);
+    })
+    .on('otr_file_error', function(username, type) {
+        log('[OTR] File error with ' + username, type);
+    })
+    .on('otr_stream_error', function(username, error) {
+        log('[OTR] Steam error with ' + username, error);
+    })
+   
+
+    /* Chat Application */
     .on('set_username_success', function(username) {
         log('successfuly set username to ' + username);
     })

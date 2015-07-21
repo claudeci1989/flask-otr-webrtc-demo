@@ -44,7 +44,7 @@
     }
     if (data.debug) sendMsg('debug', 'DSA key creation finished')
 
-    sendMsg('data', dsa)
+    sendMsg('data', dsa);
   }
 
 }(this))
